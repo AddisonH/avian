@@ -589,7 +589,7 @@ struct CcdImpact {
 /// at the first impact, leaving the next frame's collision detection to resolve the contact.
 #[cfg(any(feature = "parry-f32", feature = "parry-f64"))]
 fn solve_continuous(
-    colliders: Query<(&Collider, &Position, &Rotation)>,
+    colliders: Query<(&Collider, &Position, &Rotation, Option<&CollisionLayers>)>,
     ccd_query: Query<CcdBodyQuery>,
     mut bodies: ResMut<SolverBodies>,
     trees: Res<ColliderTrees>,
@@ -722,10 +722,12 @@ fn solve_continuous(
 
         // Sweep each collider attached to the body.
         for collider_entity in fast.colliders {
-            let Ok((collider1, &collider_pos1, &collider_rot1)) = colliders.get(collider_entity)
+            let Ok((collider1, &collider_pos1, &collider_rot1, layers1)) =
+                colliders.get(collider_entity)
             else {
                 continue;
             };
+            let layers1 = layers1.copied().unwrap_or_default();
 
             let motion1 =
                 collider_sweep_motion(collider_pos1.0, collider_rot1, body_com_world, body, inv_dt);
@@ -763,6 +765,13 @@ fn solve_continuous(
                         return true;
                     }
 
+                    // Skip colliders this one doesn't collide with: clamping its motion
+                    // against them would stop it dead on something it passes through
+                    // (and a body hanging from joints would be spun up by them).
+                    if !layers1.interacts_with(proxy.layers) {
+                        return true;
+                    }
+
                     let collider_entity2 = proxy.collider;
 
                     // If the narrow phase already has a touching contact for this pair,
@@ -780,7 +789,7 @@ fn solve_continuous(
                     }
 
                     // Fetch the target collider and its start-of-frame pose.
-                    let Ok((collider2, &target_pos, &target_rot)) = colliders.get(collider_entity2)
+                    let Ok((collider2, &target_pos, &target_rot, _)) = colliders.get(collider_entity2)
                     else {
                         return true;
                     };
