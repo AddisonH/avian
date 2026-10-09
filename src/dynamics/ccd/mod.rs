@@ -789,7 +789,8 @@ fn solve_continuous(
                     }
 
                     // Fetch the target collider and its start-of-frame pose.
-                    let Ok((collider2, &target_pos, &target_rot, _)) = colliders.get(collider_entity2)
+                    let Ok((collider2, &target_pos, &target_rot, _)) =
+                        colliders.get(collider_entity2)
                     else {
                         return true;
                     };
